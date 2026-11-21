@@ -1,0 +1,161 @@
+**FREE
+/IF NOT DEFINED(MTG_H)
+/DEFINE MTG_H
+
+// =====================================================================
+// Header Copybook: MTG_H.rpgleinc
+// Purpose: Common Prototypes, Return Codes, and Data Structures
+// =====================================================================
+
+// Return Codes
+dcl-c RC_SUCCESS     'OK';
+dcl-c RC_REFER       'REFER';
+dcl-c RC_DECLINE     'DECLINE';
+dcl-c RC_ERROR       'ERR';
+
+// Application Statuses
+dcl-c STAT_DRAFT     'DRAFT';
+dcl-c STAT_SUBMITTED 'SUBMITTED';
+dcl-c STAT_APPROVED  'APPROVED';
+dcl-c STAT_REFERRED  'REFERRED';
+dcl-c STAT_DECLINED  'DECLINED';
+
+// ---------------------------------------------------------------------
+// Common Templates & Data Structures
+// ---------------------------------------------------------------------
+
+dcl-ds ds_Application qualified template;
+  appId          int(10);
+  custName       varchar(80);
+  appType        varchar(20);
+  status         varchar(20);
+  propertyValue  packed(11: 2);
+  loanAmount     packed(11: 2);
+  termYears      int(5);
+  prodId         varchar(10);
+  interestRate   packed(5: 2);
+  monthlyPayment packed(9: 2);
+  createdTs      timestamp;
+  updatedTs      timestamp;
+end-ds;
+
+dcl-ds ds_FinancialProfile qualified template;
+  appId          int(10);
+  grossIncome    packed(11: 2);
+  otherIncome    packed(11: 2);
+  monthlyExpenses packed(9: 2);
+  existingDebts  packed(9: 2);
+  creditScore    int(5);
+  employmentSts  varchar(30);
+end-ds;
+
+dcl-ds ds_Product qualified template;
+  prodId         varchar(10);
+  prodName       varchar(60);
+  rateType       varchar(20);
+  initialRate    packed(5: 2);
+  maxLTV         packed(5: 2);
+  fee            packed(7: 2);
+  description    varchar(120);
+end-ds;
+
+dcl-ds ds_DecisionResult qualified template;
+  appId          int(10);
+  decisionCode   varchar(10);     // 'APPROVED', 'REFERRED', 'DECLINED'
+  reasonCode     varchar(30);     // 'STANDARD_APPROVAL', 'LTV_TOO_HIGH', etc.
+  reasonDesc     varchar(120);
+  maxLoanAllowed packed(11: 2);
+  evaluatedTs    timestamp;
+end-ds;
+
+// ---------------------------------------------------------------------
+// Service Program Prototypes
+// ---------------------------------------------------------------------
+
+// MTGCALC_SV: Calculation Engine
+dcl-pr mtg_calcLTV packed(5: 2);
+  pLoanAmount   packed(11: 2) const;
+  pPropValue    packed(11: 2) const;
+end-pr;
+
+dcl-pr mtg_calcAffordability packed(11: 2);
+  pGrossIncome  packed(11: 2) const;
+  pOtherIncome  packed(11: 2) const;
+  pMonthlyExp   packed(9: 2) const;
+  pDebts        packed(9: 2) const;
+end-pr;
+
+dcl-pr mtg_calcRepayment packed(9: 2);
+  pPrincipal    packed(11: 2) const;
+  pRatePct      packed(5: 2) const;
+  pTermYears    int(5) const;
+end-pr;
+
+// MTGAPP_SV: Application Lifecycle
+dcl-pr mtg_createApp int(10);
+  pAppType      varchar(20) const;
+  pCustName     varchar(80) const;
+end-pr;
+
+dcl-pr mtg_savePropertyDetails ind;
+  pAppId        int(10) const;
+  pPropValue    packed(11: 2) const;
+  pLoanAmt      packed(11: 2) const;
+  pTermYrs      int(5) const;
+end-pr;
+
+dcl-pr mtg_submitApplication varchar(20);
+  pAppId        int(10) const;
+end-pr;
+
+dcl-pr mtg_getApplicationStatus ind;
+  pAppId        int(10) const;
+  pAppDs        likeds(ds_Application);
+end-pr;
+
+// MTGFIN_SV: Financial Profile
+dcl-pr mtg_saveFinances ind;
+  pFinProfile   likeds(ds_FinancialProfile) const;
+end-pr;
+
+dcl-pr mtg_getFinances ind;
+  pAppId        int(10) const;
+  pFinProfile   likeds(ds_FinancialProfile);
+end-pr;
+
+// MTGPRD_SV: Products & Rates
+dcl-pr mtg_getEligibleProducts int(5);
+  pLTV          packed(5: 2) const;
+  pProdList     likeds(ds_Product) dim(10);
+end-pr;
+
+dcl-pr mtg_selectProduct ind;
+  pAppId        int(10) const;
+  pProdId       varchar(10) const;
+  pRate         packed(5: 2) const;
+  pMonthlyPmt   packed(9: 2) const;
+end-pr;
+
+// MTGDOC_SV: Document Metadata
+dcl-pr mtg_addDocMetadata ind;
+  pAppId        int(10) const;
+  pDocType      varchar(30) const;
+  pFileName     varchar(100) const;
+end-pr;
+
+// MTGDEC_SV: Decision Engine
+dcl-pr mtg_evaluateDecision ind;
+  pAppId        int(10) const;
+  pDecisionDs   likeds(ds_DecisionResult);
+end-pr;
+
+// Audit Logging
+dcl-pr mtg_writeAudit ind;
+  pAppId        int(10) const;
+  pAction       varchar(30) const;
+  pHttpStatus   int(10) const;
+  pStatusCode   varchar(20) const;
+  pOutputJson   varchar(4000) const;
+end-pr;
+
+/ENDIF
