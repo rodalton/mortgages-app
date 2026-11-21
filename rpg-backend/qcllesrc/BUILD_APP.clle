@@ -1,0 +1,61 @@
+/* ===================================================================== */
+/* Program: BUILD_APP.clle                                               */
+/* Purpose: Compiles all DB2 DDL, RPG modules, Service Programs, & PGM  */
+/* ===================================================================== */
+PGM PARM(&LIB)
+
+    DCL VAR(&LIB) TYPE(*CHAR) LEN(10)
+
+    IF COND(&LIB *EQ ' ') THEN(CHGVAR VAR(&LIB) VALUE('*CURLIB'))
+
+    /* 1. Create Binding Directory */
+    CRTBNDDIR  BNDDIR(&LIB/MTGBND) TEXT('Mortgage Demo Binding Directory')
+    MONMSG     MSGID(CPF2112) /* Already exists */
+
+    /* 2. Execute SQL DDL Tables */
+    RUNSQLSTM  SRCFILE(&LIB/QDDLSRC) SRCMBR(MTG_SCHEMA) COMMIT(*NONE)
+
+    /* 3. Compile Modules */
+    CRTRPGMOD  MODULE(&LIB/MTGCALC_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGCALC_SV) DBGVIEW(*SOURCE)
+
+    CRTSQLRPGI OBJ(&LIB/MTGAPP_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGAPP_SV) OBJTYPE(*MODULE) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDMOD)
+
+    CRTSQLRPGI OBJ(&LIB/MTGFIN_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGFIN_SV) OBJTYPE(*MODULE) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDMOD)
+
+    CRTSQLRPGI OBJ(&LIB/MTGPRD_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGPRD_SV) OBJTYPE(*MODULE) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDMOD)
+
+    CRTSQLRPGI OBJ(&LIB/MTGDOC_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGDOC_SV) OBJTYPE(*MODULE) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDMOD)
+
+    CRTSQLRPGI OBJ(&LIB/MTGDEC_SV) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGDEC_SV) OBJTYPE(*MODULE) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDMOD)
+
+    /* 4. Create Service Program */
+    CRTSRVPGM  SRVPGM(&LIB/MTG_SV) +
+                 MODULE(&LIB/MTGCALC_SV &LIB/MTGAPP_SV &LIB/MTGFIN_SV +
+                        &LIB/MTGPRD_SV &LIB/MTGDOC_SV &LIB/MTGDEC_SV) +
+                 SRCFILE(&LIB/QSRVSRC) SRCMBR(MTG) +
+                 ACTGRP(*CALLER)
+
+    /* 5. Add Service Program to Binding Directory */
+    ADDBNDDIRE BNDDIR(&LIB/MTGBND) OBJ((&LIB/MTG_SV *SRVPGM))
+    MONMSG     MSGID(CPF5D0B) /* Entry already exists */
+
+    /* 6. Compile API Dispatcher REST Program */
+    CRTSQLRPGI OBJ(&LIB/MTGREST) SRCFILE(&LIB/QRPGLESRC) +
+                 SRCMBR(MTGREST) OBJTYPE(*PGM) DBGVIEW(*SOURCE) +
+                 CLOSQLCSR(*ENDACTGRP) ACTGRP(*NEW)
+
+    SNDPGMMSG  MSG('Mortgage Demo Showcase build completed successfully!') +
+                 MSGTYPE(*INFO)
+
+ENDPGM
